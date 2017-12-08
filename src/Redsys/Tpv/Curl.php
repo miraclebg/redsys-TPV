@@ -1,4 +1,5 @@
 <?php
+
 namespace Redsys\Tpv;
 
 use DOMDocument;
@@ -49,11 +50,7 @@ class Curl
 
         curl_setopt($this->connect, CURLOPT_HEADER, false);
         curl_setopt($this->connect, CURLOPT_HTTPHEADER, $header);
-
-        if (!ini_get('open_basedir') && !filter_var(ini_get('safe_mode'), FILTER_VALIDATE_BOOLEAN)) {
-            curl_setopt($this->connect, CURLOPT_FOLLOWLOCATION, true);
-        }
-
+        curl_setopt($this->connect, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($this->connect, CURLOPT_AUTOREFERER, true);
         curl_setopt($this->connect, CURLOPT_COOKIEJAR, $this->settings['cookie']);
         curl_setopt($this->connect, CURLOPT_COOKIEFILE, $this->settings['cookie']);
@@ -80,7 +77,7 @@ class Curl
 
     public function exec($url, $get = array(), $post = array())
     {
-        $url = $this->settings['base'].str_replace($this->settings['base'], '', $url);
+        $url = $this->settings['base'] . str_replace($this->settings['base'], '', $url);
 
         if ($get && is_array($get)) {
             $url .= strstr($url, '?') ? '&' : '?';
@@ -129,7 +126,7 @@ class Curl
         }
 
         $base = parse_url($this->info['url']);
-        $this->settings['base'] = $base['scheme'].'://'.$base['host'];
+        $this->settings['base'] = $base['scheme'] . '://' . $base['host'];
     }
 
     public function getXPath()

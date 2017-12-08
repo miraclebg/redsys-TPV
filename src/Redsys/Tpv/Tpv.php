@@ -1,4 +1,5 @@
 <?php
+
 namespace Redsys\Tpv;
 
 use Exception;
@@ -19,7 +20,7 @@ class Tpv
     private $option_prefix = 'Ds_Merchant_';
 
     private $o_required = array('Environment', 'Currency', 'Terminal', 'ConsumerLanguage', 'MerchantCode', 'Key', 'SignatureVersion', 'MerchantName', 'Titular');
-    private $o_optional = array('UrlOK', 'UrlKO', 'TransactionType', 'MerchantURL', 'PayMethods');
+    private $o_optional = array('UrlOK', 'UrlKO', 'TransactionType', 'MerchantURL', 'PayMethods', 'Group');
 
     private $environment = '';
     private $environments = array(
@@ -83,7 +84,7 @@ class Tpv
 
     public function getPath($path = '/realizarPago')
     {
-        return $this->environment.$path;
+        return $this->environment . $path;
     }
 
     public function getEnvironments($key = null)
@@ -114,14 +115,17 @@ class Tpv
         $this->setValueDefault($options, 'Titular');
         $this->setValueDefault($options, 'TransactionType');
         $this->setValueDefault($options, 'MerchantName');
+        $this->setValueDefault($options, 'MerchantIdentifier');
         $this->setValueDefault($options, 'MerchantURL');
         $this->setValueDefault($options, 'ConsumerLanguage');
         $this->setValueDefault($options, 'UrlOK');
         $this->setValueDefault($options, 'UrlKO');
         $this->setValueDefault($options, 'PayMethods');
-        $this->setValueDefault($options, 'Identifier');
 
-        $this->setValues($options);
+        $this->setValue($options, 'MerchantData');
+        $this->setValue($options, 'Order');
+        $this->setValue($options, 'ProductDescription');
+        $this->setValue($options, 'Amount');
 
         return $this;
     }
@@ -133,23 +137,18 @@ class Tpv
         }
 
         return $this->getInputHidden('SignatureVersion', $this->options['SignatureVersion'])
-            .$this->getInputHidden('MerchantParameters', $this->getMerchantParametersEncoded())
-            .$this->getInputHidden('Signature', $this->getValuesSignature());
+            . $this->getInputHidden('MerchantParameters', $this->getMerchantParameters())
+            . $this->getInputHidden('Signature', $this->getValuesSignature());
     }
 
-    public function getInputHidden($name, $value)
+    private function getInputHidden($name, $value)
     {
-        return "\n".'<input type="hidden" name="Ds_'.$name.'" value="'.$value.'" />';
+        return "\n" . '<input type="hidden" name="Ds_' . $name . '" value="' . $value . '" />';
     }
 
-    public function getMerchantParameters()
+    private function getMerchantParameters()
     {
-        return $this->values;
-    }
-
-    public function getMerchantParametersEncoded()
-    {
-        return base64_encode(json_encode($this->getMerchantParameters()));
+        return base64_encode(json_encode($this->values));
     }
 
     public function sendXml(array $options)
@@ -161,12 +160,14 @@ class Tpv
 
         $this->setValueDefault($options, 'MerchantCode');
         $this->setValueDefault($options, 'MerchantURL');
+        $this->setValueDefault($options, 'Identifier');
         $this->setValueDefault($options, 'Currency');
         $this->setValueDefault($options, 'Terminal');
-        $this->setValueDefault($options, 'Identifier');
-        $this->setValueDefault($options, 'DirectPayment');
+        $this->setValueDefault($options, 'Group');
 
-        $this->setValues($options);
+        $this->setValue($options, 'TransactionType');
+        $this->setValue($options, 'Order');
+        $this->setValue($options, 'Amount');
 
         $Curl = new Curl(array(
             'base' => $this->getPath('')
@@ -197,10 +198,6 @@ class Tpv
         $data = $doc->createElement('DATOSENTRADA');
 
         foreach ($xml as $key => $value) {
-            if ((strpos($value, '?') !== false) && (strpos($value, '&') !== false) && (strpos($value, '&amp;') === false)) {
-                $value = str_replace('&', '&amp;', $value);
-            }
-
             $data->appendChild((new DOMElement(strtoupper($key), $value)));
         }
 
@@ -212,7 +209,7 @@ class Tpv
 
         $doc->appendChild($root);
 
-        return (string) $doc->saveXML();
+        return (string)$doc->saveXML();
     }
 
     public function xmlString2array($xml)
@@ -224,7 +221,7 @@ class Tpv
     {
         $prefix = 'Ds_';
 
-        if (empty($post) || empty($post[$prefix.'Signature']) || empty($post[$prefix.'MerchantParameters'])) {
+        if (empty($post) || empty($post[$prefix . 'Signature']) || empty($post[$prefix . 'MerchantParameters'])) {
             throw new Exception('_POST data is empty');
         }
 
@@ -235,23 +232,19 @@ class Tpv
             throw new Exception('_POST data can not be decoded');
         }
 
-        if (empty($data[$prefix.'Order'])) {
-            throw new Exception('Order not found');
-        }
-
         $this->checkTransactionError($data, $prefix);
         $this->checkTransactionResponse($data, $prefix);
 
-        $signature = Signature::fromTransactionXML($post[$prefix.'MerchantParameters'], $data[$prefix.'Order'], $this->options['Key']);
+        $signature = Signature::fromTransactionXml($prefix, $data, $this->options['Key']);
 
-        $this->checkTransactionSignature($signature, $post[$prefix.'Signature']);
+        $this->checkTransactionSignature($signature, $post[$prefix . 'Signature']);
 
         return array_merge($post, $data);
     }
 
     private function setValueDefault(array $options, $option)
     {
-        $code = $this->option_prefix.$option;
+        $code = $this->option_prefix . $option;
 
         if (isset($options[$option])) {
             $this->values[$code] = $options[$option];
@@ -265,20 +258,7 @@ class Tpv
     private function setValue(array $options, $option)
     {
         if (isset($options[$option])) {
-            $this->values[$this->option_prefix.$option] = $options[$option];
-        }
-
-        return $this;
-    }
-
-    private function setValues(array $options)
-    {
-        foreach ($options as $key => $value) {
-            $key = $this->option_prefix.$key;
-
-            if (!isset($this->values[$key])) {
-                $this->values[$key] = $value;
-            }
+            $this->values[$this->option_prefix . $option] = $options[$option];
         }
 
         return $this;
@@ -294,9 +274,9 @@ class Tpv
 
         if (($len < 4) || ($len > 12)) {
             throw new Exception('Order code must have more than 4 digits and less than 12');
-        } elseif (!preg_match('/^[0-9]{4}[0-9a-zA-Z]{0,8}$/', $order)) {
+        } /*elseif (!preg_match('/^[0-9]{4}[0-9a-zA-Z]{0,8}$/', $order)) {
             throw new Exception('First four order digits must be numbers and then only are allowed numbers and letters');
-        }
+        }*/
 
         return $order;
     }
@@ -327,7 +307,7 @@ class Tpv
     {
         $prefix = 'Ds_';
 
-        if (empty($post) || empty($post[$prefix.'Signature']) || empty($post[$prefix.'MerchantParameters'])) {
+        if (empty($post) || empty($post[$prefix . 'Signature']) || empty($post[$prefix . 'MerchantParameters'])) {
             throw new Exception('_POST data is empty');
         }
 
@@ -342,14 +322,14 @@ class Tpv
 
         $signature = Signature::fromTransaction($prefix, $data, $this->options['Key']);
 
-        $this->checkTransactionSignature($signature, $post[$prefix.'Signature']);
+        $this->checkTransactionSignature($signature, $post[$prefix . 'Signature']);
 
         return array_merge($post, array_map('urldecode', $data));
     }
 
     private function checkTransactionError(array $data, $prefix)
     {
-        $error = isset($data[$prefix.'ErrorCode']) ? $data[$prefix.'ErrorCode'] : null;
+        $error = isset($data[$prefix . 'ErrorCode']) ? $data[$prefix . 'ErrorCode'] : null;
 
         if (empty($error)) {
             return null;
@@ -364,7 +344,7 @@ class Tpv
 
     private function checkTransactionResponse(array $data, $prefix)
     {
-        $response = isset($data[$prefix.'Response']) ? $data[$prefix.'Response'] : null;
+        $response = isset($data[$prefix . 'Response']) ? $data[$prefix . 'Response'] : null;
 
         if (is_null($response) || (strlen($response) === 0)) {
             throw new Exception('Response code is empty (no length)');
@@ -381,7 +361,9 @@ class Tpv
 
     private function checkTransactionSignature($signature, $postSignature)
     {
-        if ($signature !== strtr($postSignature, '-_', '+/')) {
+        $postSignature = strtr($postSignature, '-_', '+/');
+
+        if ($signature !== $postSignature) {
             throw new Exception(sprintf('Signature not valid (%s != %s)', $signature, $postSignature));
         }
     }
