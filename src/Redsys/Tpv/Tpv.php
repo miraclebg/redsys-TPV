@@ -151,7 +151,7 @@ class Tpv
         return base64_encode(json_encode($this->values));
     }
 
-    public function sendXml(array $options)
+    public function sendXml(array $options, & $post_data)
     {
         $this->values = array();
 
@@ -175,8 +175,10 @@ class Tpv
 
         $Curl->setHeader(CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
 
+        $post_data = $this->xmlArray2string($this->setXmlValues());
+
         return $Curl->post('/operaciones', array(
-            'entrada' => $this->xmlArray2string($this->setXmlValues())
+            'entrada' => $post_data
         ));
     }
 
