@@ -1,4 +1,5 @@
 <?php
+
 namespace Redsys\Tpv;
 
 use Exception;
@@ -40,12 +41,12 @@ class Signature
     private static function calculate($prefix, array $fields, array $values, $key)
     {
         foreach ($fields as $field) {
-            if (!isset($values[$prefix.$field])) {
+            if (!isset($values[$prefix . $field])) {
                 throw new Exception(sprintf('Field <strong>%s</strong> is empty and required', $field));
             }
         }
 
-        $key = self::encryptKey($values[$prefix.'Order'], $key);
+        $key = self::encryptKey($values[$prefix . 'Order'], $key);
 
         return self::MAC256(base64_encode(json_encode($values)), $key);
     }
@@ -54,7 +55,9 @@ class Signature
     {
         $iv = implode(array_map('chr', array(0, 0, 0, 0, 0, 0, 0, 0)));
 
-        return mcrypt_encrypt(MCRYPT_3DES, $key, $message, MCRYPT_MODE_CBC, $iv);
+        return phpseclib_mcrypt_encrypt(MCRYPT_3DES, $key, $message, MCRYPT_MODE_CBC, $iv);
+
+        //return mcrypt_encrypt(MCRYPT_3DES, $key, $message, MCRYPT_MODE_CBC, $iv);
     }
 
     private static function encryptKey($order, $key)

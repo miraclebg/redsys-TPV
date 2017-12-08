@@ -26,6 +26,7 @@ class Debug
 
     public static function dd($info, $title = '')
     {
+        /** @noinspection PhpVoidFunctionResultUsedInspection */
         die(self::d($info, $title, 2));
     }
 }

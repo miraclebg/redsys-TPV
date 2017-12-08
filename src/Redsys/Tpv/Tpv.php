@@ -336,7 +336,8 @@ class Tpv
         }
 
         if ($message = Messages::getByCode($error)) {
-            throw new Exception(sprintf('TPV returned error code %s: %s', $error, $message['message']));
+            throw new Exception(sprintf('TPV returned error code %s: %s', $error,
+                (is_array($message) ? $message['message'] : $message)));
         } else {
             throw new Exception(sprintf('TPV returned unknown error code %s', $error));
         }
@@ -352,7 +353,8 @@ class Tpv
 
         if (((int)$response < 0) || (((int)$response > 99) && ($response !== 900))) {
             if ($message = Messages::getByCode($response)) {
-                throw new Exception(sprintf('Response code is Transaction Denied %s: %s', $response, $message['message']));
+                throw new Exception(sprintf('Response code is Transaction Denied %s: %s', $response,
+                    (is_array($message) ? $message['message'] : $message)));
             } else {
                 throw new Exception(sprintf('Response code is unknown %s', $response));
             }
